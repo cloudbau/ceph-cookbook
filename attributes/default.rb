@@ -1,11 +1,16 @@
 default['ceph']['install_debug'] = false
-default['ceph']['encrypted_data_bags'] = false
 
 default['ceph']['install_repo'] = true
 
+default['ceph']['user_pools'] = []
+
 case node['platform']
 when 'ubuntu'
-  default['ceph']['init_style'] = 'upstart'
+  if node['platform_version'].to_f >= 15.04
+    default['ceph']['init_style'] = 'systemd'
+  else
+    default['ceph']['init_style'] = 'upstart'
+  end
 else
   default['ceph']['init_style'] = 'sysvinit'
 end

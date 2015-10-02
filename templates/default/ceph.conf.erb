@@ -2,7 +2,7 @@
 <% unless node['ceph']['config']['fsid'].nil? -%>
   fsid = <%= node['ceph']['config']['fsid'] %>
 <% end -%>
-<% if node['ceph']['is_mon'] -%>
+<% if node['ceph']['is_mon'] and (! node['ceph']['config']['mon_initial_members'].nil?) -%>
   mon initial members = <%= node['ceph']['config']['mon_initial_members'] %>
 <% end -%>
   mon host = <%= @mon_addresses.sort.join(', ') %>
@@ -34,12 +34,19 @@
 <% end -%>
 
 <% if (@is_rgw) -%>
-[client.radosgw.<%= node['hostname'] %>]
+[client.radosgw.<%= @rgw_clientname %>]
+<% if node['ceph']['radosgw']['webserver_companion'] == 'civetweb' -%>
+  <% if node['ceph']['radosgw']['rgw_port'] == false %>
+  rgw frontends = "civetweb port=80"
+<% else -%>
+  rgw frontends = "civetweb port=<%=node['ceph']['radosgw']['rgw_port']%>"
+<% end -%>
+<% end -%>
   host = <%= node['hostname'] %>
-  rgw socket path = /var/run/ceph-radosgw/radosgw.<%= node['hostname'] %>
-  admin socket = /var/run/ceph-radosgw/ceph-client.radosgw.<%= node['hostname'] %>.asok
+  rgw socket path = /var/run/ceph-radosgw/radosgw.<%= @rgw_clientname %>
+  admin socket = /var/run/ceph-radosgw/ceph-client.radosgw.<%= @rgw_clientname %>.asok
   pid file = /var/run/ceph-radosgw/$name.pid
-  keyring = /etc/ceph/ceph.client.radosgw.<%= node['hostname'] %>.keyring
+  keyring = /etc/ceph/ceph.client.radosgw.<%= @rgw_clientname %>.keyring
   log file = /var/log/radosgw/radosgw.log
 <% if (! node['ceph']['config']['rgw'].nil?) -%>
   <% node['ceph']['config']['rgw'].sort.each do |k, v| %>

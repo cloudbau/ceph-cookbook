@@ -1,4 +1,6 @@
 # Chef cookbook [![Build Status](https://travis-ci.org/ceph/ceph-cookbook.svg?branch=master)](https://travis-ci.org/ceph/ceph-cookbook) [![Gitter chat](https://badges.gitter.im/ceph/ceph-cookbook.png)](https://gitter.im/ceph/ceph-cookbook)
+## Important
+The current version 0.8.0 will soon be archived and a new version on the master branch will appear that supports Chef 12+.
 
 ## DESCRIPTION
 
@@ -60,6 +62,18 @@ The other set of attributes that this recipe needs is `node['ceph']['osd_devices
 * {'device' => '/dev/sde', 'dmcrypt' => true} - Store the data encrypted by passing --dmcrypt to `ceph-disk-prepare`
 * {'device' => '/dev/sdc', 'journal' => '/dev/sdd2'} - use a full disk for the OSD with a custom partition for the journal
 
+### Using a Policy Wrapper Cookbook
+
+To automate setting several of these node attributes, it is recommended to use a policy wrapper cookbook. This allows the ability to use Chef Server cookbook versions along with environment version restrictions to roll out configuration changes in an ordered fashion.
+
+It also can help with automating some settings. For example, a wrapper cookbook could peek at the list of harddrives that ohai has found and populate node['ceph']['osd_devices'] accordingly, instead of manually typing them all in:
+
+```ruby
+node.override['ceph']['osd_devices'] = node['block_device'].each.reject{ |name, data| name !~ /^sd[b-z]/}.sort.map { |name, data| {'journal' => "/dev/#{name}"} }
+```
+
+For best results, the wrapper cookbook's recipe should be placed before the Ceph cookbook in the node's runlist. This will ensure that any attributes are in place before the Ceph cookbook runs and consumes those attributes.
+
 ### Ceph Monitor
 
 Ceph monitor nodes should use the ceph-mon role.
@@ -102,6 +116,8 @@ Ceph Rados Gateway nodes should use the ceph-radosgw role
 * `node['ceph']['config']['global']['cluster network']` - a CIDR specification of a separate cluster replication network
 * `node['ceph']['config']['config-sections']` - add to this hash to add extra config sections to the ceph.conf
 
+* `node['ceph']['user_pools']` - an array of pool definitions, with attributes `name`, `pg_num` and `create_options` (optional), that are automatically created when a monitor is deployed
+
 ### Ceph MON
 
 * `node['ceph']['config']['mon']` - a hash of settings to save in ceph.conf in the [mon] section, such as `'mon osd nearfull ratio' => '0.70'`
@@ -124,7 +140,7 @@ Ceph Rados Gateway nodes should use the ceph-radosgw role
 * `node['ceph']['radosgw']['admin_email']` - the admin email address to configure in the web server
 * `node['ceph']['radosgw']['rgw_addr']` - the web server's bind address, such as *:80
 * `node['ceph']['radosgw']['rgw_port']` - if set, connects to the radosgw fastcgi over this port instead of a unix socket
-* `node['ceph']['radosgw']['webserver_companion']` - defaults to 'apache2', but can be set to false to not configure anything
+* `node['ceph']['radosgw']['webserver_companion']` - defaults to 'apache2', but it can be set to 'civetweb', or to false in order to leave it unconfigured
 * `node['ceph']['radosgw']['path']` - where to save the s3gw.fcgi file
 * `node['ceph']['config']['global']['rgw dns name']` -  the main domain of the radosgw daemon, to calculate the bucket name from a subdomain
 
@@ -166,6 +182,24 @@ The ceph\_cephfs LWRP provides an easy way to mount CephFS. It will automaticall
 - :directory - name attribute. Where to mount CephFS in the local filesystem
 - :use\_fuse - whether to use ceph-fuse or the kernel client to mount the filesystem. ceph-fuse is updated more often, but the kernel client allows for subdirectory mounting. Defaults to true
 - :cephfs\_subdir - which CephFS subdirectory to mount. Defaults to '/'. An exception will be thrown if this option is set to anything other than '/' if use\_fuse is also true
+
+### ceph\_pool
+
+The ceph\_pool LWRP provides an easy way to create and delete Ceph pools.
+
+It assumes that connectivity to the cluster is setup and that admin credentials are available from default locations, e.g. /etc/ceph/ceph.client.admin.keyring.
+
+#### Actions
+
+- :add - creates a pool with the given number of placement groups
+- :delete - deletes an existing pool
+
+#### Parameters
+
+- :name - the name of the pool to create or delete
+- :pg_num - number of placement groups, when creating a new pool
+- :create_options - arguments for pool creation (optional)
+- :force - force the deletion of an exiting pool along with any data that is stored in it
 
 ## DEVELOPING
 
